@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IDP Flow Map — Displacement Movements</title>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<!-- Leaflet JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- D3 for color scales -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<!-- Leaflet.heat (optional) / we use custom SVG animation -->
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --panel-bg: rgba(15,17,23,0.95);
+    --panel-border: rgba(255,255,255,0.08);
+    --text: #e8eaf0;
+    --text-muted: #8a8fa8;
+    --accent: #e07b39;
+    --accent2: #4a90d9;
+    --green: #2ecc71;
+    --red: #e74c3c;
+    --font: 'Segoe UI', system-ui, sans-serif;
+    --radius: 10px;
+    --shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+
+  body.light {
+    --bg: #f0f2f5;
+    --panel-bg: rgba(255,255,255,0.97);
+    --panel-border: rgba(0,0,0,0.10);
+    --text: #1a1d2e;
+    --text-muted: #5a5f78;
+    --shadow: 0 4px 24px rgba(0,0,0,0.12);
+  }
+
+  html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text); overflow: hidden; }
+
+  #map { position: absolute; inset: 0; z-index: 1; }
+
+  /* ── SIDEBAR ── */
+  #sidebar {
+    position: absolute;
+    top: 12px; left: 12px;
+    width: 280px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  #sidebar::-webkit-scrollbar { display: none; }
+
+  .panel {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
+  }
+
+  .panel-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  /* Map title panel */
+  #title-panel h1 {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  #title-panel p {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* Stats grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--panel-border);
+    border-radius: 7px;
+    padding: 8px 10px;
+  }
+  body.light .stat-card { background: rgba(0,0,0,0.03); }
+  .stat-label { font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
+  .stat-value { font-size: 17px; font-weight: 700; color: var(--text); line-height: 1; }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.blue { color: var(--accent2); }
+
+  /* Filter slider */
+  .filter-row { margin-bottom: 10px; }
+  .filter-row label { font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .filter-row label span { color: var(--text); font-weight: 600; }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.12);
+    outline: none;
+  }
+  body.light input[type=range] { background: rgba(0,0,0,0.10); }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--panel-bg);
+  }
+
+  /* Toggle buttons */
+  .toggle-group { display: flex; gap: 6px; flex-wrap: wrap; }
+  .toggle-btn {
+    flex: 1;
+    min-width: 60px;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.18s;
+    text-align: center;
+  }
+  .toggle-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .toggle-btn.active.blue-btn { background: var(--accent2); border-color: var(--accent2); }
+
+  /* Animation controls */
+  .anim-row { display: flex; align-items: center; gap: 8px; }
+  .play-btn {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--panel-border);
+    background: var(--accent);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.1s;
+  }
+  .play-btn:hover { transform: scale(1.08); }
+  .speed-label { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+
+  /* Legend */
+  .legend-bar {
+    height: 10px;
+    border-radius: 5px;
+    margin: 6px 0 4px;
+  }
+  .legend-ends { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); }
+  .legend-dots { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+  .legend-dot { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Width legend */
+  .width-legend { display: flex; align-items: flex-end; gap: 4px; margin-top: 6px; }
+  .wl-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .wl-line { border-radius: 3px; background: var(--accent); width: 28px; }
+  .wl-label { font-size: 9px; color: var(--text-muted); }
+
+  /* Theme toggle */
+  #theme-toggle {
+    position: absolute;
+    top: 12px; right: 12px;
+    z-index: 1000;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
+    font-family: var(--font);
+  }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute;
+    z-index: 2000;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px 13px;
+    font-size: 12px;
+    color: var(--text);
+    box-shadow: var(--shadow);
+    pointer-events: none;
+    max-width: 220px;
+    display: none;
+    backdrop-filter: blur(12px);
+  }
+  #tooltip .tt-route { font-weight: 700; font-size: 13px; margin-bottom: 5px; color: var(--accent); }
+  #tooltip .tt-row { display: flex; justify-content: space-between; gap: 12px; }
+  #tooltip .tt-key { color: var(--text-muted); }
+  #tooltip .tt-val { font-weight: 600; }
+
+  /* Flow SVG overlay */
+  #flow-svg {
+    position: absolute;
+    inset: 0;
+    z-index: 500;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  /* Animated dash style injected per path */
+  @keyframes dash-move {
+    to { stroke-dashoffset: -60; }
+  }
+
+  /* Mobile */
+  @media (max-width: 600px) {
+    #sidebar { width: calc(100vw - 24px); }
+  }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+<svg id="flow-svg"></svg>
+<div id="tooltip"></div>
+<button id="theme-toggle" onclick="toggleTheme()">☀ Light mode</button>
+
+<div id="sidebar">
+
+  <!-- Title -->
+  <div class="panel" id="title-panel">
+    <h1>IDP Displacement Flows</h1>
+    <p>Animated movement from origin to displacement localities</p>
+  </div>
+
+  <!-- Stats -->
+  <div class="panel">
+    <div class="panel-title">Summary statistics</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total IDPs</div>
+        <div class="stat-value accent" id="stat-total">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Flow routes</div>
+        <div class="stat-value" id="stat-flows">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Origin localities</div>
+        <div class="stat-value blue" id="stat-origins">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Destination sites</div>
+        <div class="stat-value" id="stat-dests">—</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;">
+      <div class="stat-label">Largest single flow</div>
+      <div style="font-size:12px; color:var(--text); font-weight:600; margin-top:3px;" id="stat-largest">—</div>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="panel">
+    <div class="panel-title">Filter flows</div>
+    <div class="filter-row">
+      <label>Min IDP count <span id="slider-val">0</span></label>
+      <input type="range" id="filter-slider" min="0" max="10000" step="50" value="0" oninput="onSliderChange(this.value)"/>
+    </div>
+  </div>
+
+  <!-- Toggles -->
+  <div class="panel">
+    <div class="panel-title">Show / hide layers</div>
+    <div class="toggle-group">
+      <button class="toggle-btn active" id="tog-flows" onclick="toggleLayer('flows')">Flows</button>
+      <button class="toggle-btn active blue-btn" id="tog-origins" onclick="toggleLayer('origins')">Origins</button>
+      <button class="toggle-btn active" id="tog-dests" onclick="toggleLayer('dests')" style="background:var(--red); border-color:var(--red); color:#fff;">Destinations</button>
+    </div>
+  </div>
+
+  <!-- Animation controls -->
+  <div class="panel">
+    <div class="panel-title">Animation</div>
+    <div class="anim-row">
+      <button class="play-btn" id="play-btn" onclick="togglePlay()" title="Play/Pause">⏸</button>
+      <div style="flex:1;">
+        <label style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between; margin-bottom:5px;">Speed <span id="speed-val">1×</span></label>
+        <input type="range" id="speed-slider" min="0.3" max="3" step="0.1" value="1" oninput="onSpeedChange(this.value)"/>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="panel">
+    <div class="panel-title">Legend</div>
+    <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Flow color — IDP volume</div>
+    <div class="legend-bar" id="legend-gradient"></div>
+    <div class="legend-ends">
+      <span id="legend-min">Low</span>
+      <span id="legend-max">High</span>
+    </div>
+
+    <div style="margin-top:10px; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Flow width — IDP count</div>
+    <div class="width-legend">
+      <div class="wl-item"><div class="wl-line" style="height:2px;"></div><div class="wl-label">Low</div></div>
+      <div class="wl-item"><div class="wl-line" style="height:5px;"></div><div class="wl-label">Mid</div></div>
+      <div class="wl-item"><div class="wl-line" style="height:9px;"></div><div class="wl-label">High</div></div>
+    </div>
+
+    <div class="legend-dots" style="margin-top:12px;">
+      <div class="legend-dot"><div class="dot" style="background:#4a90d9;"></div>Origin</div>
+      <div class="legend-dot"><div class="dot" style="background:#e74c3c;"></div>Destination</div>
+    </div>
+
+    <div style="margin-top:12px; font-size:10px; color:var(--text-muted); line-height:1.5;">
+      Data source: Field assessment survey.<br/>
+      Replace <code style="font-size:9px;">IDP_DATA</code> array with your data.
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   ★ REPLACE THIS ARRAY WITH YOUR REAL DATA ★
+   Each object must have:
+     origin_name, origin_lat, origin_lng,
+     destination_name, dest_lat, dest_lng,
+     idp_count
+═══════════════════════════════════════════ */
+const IDP_DATA = [
+  { origin_name:"Hamashkoreib", origin_lat:15.900, origin_lng:36.290, destination_name:"Kassala Town", dest_lat:15.461, dest_lng:36.400, idp_count:4200 },
+  { origin_name:"Khashm el-Girba", origin_lat:14.924, origin_lng:35.887, destination_name:"Kassala Town", dest_lat:15.461, dest_lng:36.400, idp_count:3100 },
+  { origin_name:"Telkok", origin_lat:15.750, origin_lng:36.150, destination_name:"Wad el-Helew", dest_lat:15.351, dest_lng:36.244, idp_count:1850 },
+  { origin_name:"Aroma", origin_lat:15.990, origin_lng:36.040, destination_name:"Kassala Town", dest_lat:15.461, dest_lng:36.400, idp_count:2600 },
+  { origin_name:"Hamashkoreib", origin_lat:15.900, origin_lng:36.290, destination_name:"Girba", dest_lat:14.933, dest_lng:35.921, idp_count:980 },
+  { origin_name:"Khashm el-Girba", origin_lat:14.924, origin_lng:35.887, destination_name:"Wad el-Helew", dest_lat:15.351, dest_lng:36.244, idp_count:1200 },
+  { origin_name:"Shagarab", origin_lat:16.090, origin_lng:36.330, destination_name:"Kassala Town", dest_lat:15.461, dest_lng:36.400, idp_count:3400 },
+  { origin_name:"Aroma", origin_lat:15.990, origin_lng:36.040, destination_name:"Wad el-Helew", dest_lat:15.351, dest_lng:36.244, idp_count:760 },
+  { origin_name:"Telkok", origin_lat:15.750, origin_lng:36.150, destination_name:"Kassala Town", dest_lat:15.461, dest_lng:36.400, idp_count:1450 },
+  { origin_name:"Shagarab", origin_lat:16.090, origin_lng:36.330, destination_name:"Girba", dest_lat:14.933, dest_lng:35.921, idp_count:530 },
+];
+/* ═══════════════════════════════════════════ */
+
+/* ─── State ─── */
+let minFilter = 0;
+let playing = true;
+let speedMult = 1;
+let showFlows = true, showOrigins = true, showDests = true;
+let animating = true;
+let animPaths = [];
+let originMarkers = [], destMarkers = [];
+let leafletMap, svgEl;
+
+/* ─── Color scale ─── */
+const colorScale = d3.scaleSequential()
+  .interpolator(d3.interpolateYlOrRd);
+
+/* ─── Leaflet map init ─── */
+const TILE_DARK  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const TILE_ATTR  = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>';
+
+let tileLayer;
+let currentTheme = 'dark';
+
+function initMap() {
+  leafletMap = L.map('map', { zoomControl: false });
+  L.control.zoom({ position: 'bottomright' }).addTo(leafletMap);
+
+  tileLayer = L.tileLayer(TILE_DARK, { attribution: TILE_ATTR, maxZoom: 18 });
+  tileLayer.addTo(leafletMap);
+
+  // Fit to bounding box of all points
+  const allLats = IDP_DATA.flatMap(d => [d.origin_lat, d.dest_lat]);
+  const allLngs = IDP_DATA.flatMap(d => [d.origin_lng, d.dest_lng]);
+  const bounds = [[Math.min(...allLats)-0.3, Math.min(...allLngs)-0.3],
+                  [Math.max(...allLats)+0.3, Math.max(...allLngs)+0.3]];
+  leafletMap.fitBounds(bounds);
+
+  leafletMap.on('moveend', updateSVGPaths);
+  leafletMap.on('zoomend', updateSVGPaths);
+  leafletMap.on('move', updateSVGPaths);
+
+  svgEl = document.getElementById('flow-svg');
+
+  computeStats();
+  buildMarkers();
+  buildFlows();
+  updateSVGPaths();
+  requestAnimationFrame(animateFlows);
+}
+
+/* ─── Statistics ─── */
+function computeStats() {
+  const total = IDP_DATA.reduce((s,d) => s+d.idp_count, 0);
+  const origins = new Set(IDP_DATA.map(d=>d.origin_name)).size;
+  const dests   = new Set(IDP_DATA.map(d=>d.destination_name)).size;
+  const largest = IDP_DATA.reduce((a,b) => a.idp_count>b.idp_count?a:b);
+
+  document.getElementById('stat-total').textContent  = total.toLocaleString();
+  document.getElementById('stat-flows').textContent  = IDP_DATA.length;
+  document.getElementById('stat-origins').textContent= origins;
+  document.getElementById('stat-dests').textContent  = dests;
+  document.getElementById('stat-largest').textContent= `${largest.origin_name} → ${largest.destination_name}: ${largest.idp_count.toLocaleString()}`;
+
+  const maxIDP = Math.max(...IDP_DATA.map(d=>d.idp_count));
+  const minIDP = Math.min(...IDP_DATA.map(d=>d.idp_count));
+  colorScale.domain([minIDP, maxIDP]);
+
+  // Slider max
+  document.getElementById('filter-slider').max = maxIDP;
+  document.getElementById('filter-slider').step = Math.max(1, Math.round(maxIDP/100));
+
+  // Legend gradient
+  document.getElementById('legend-gradient').style.background =
+    `linear-gradient(to right, ${d3.interpolateYlOrRd(0)}, ${d3.interpolateYlOrRd(0.5)}, ${d3.interpolateYlOrRd(1)})`;
+  document.getElementById('legend-min').textContent = minIDP.toLocaleString();
+  document.getElementById('legend-max').textContent = maxIDP.toLocaleString();
+}
+
+/* ─── Markers ─── */
+function buildMarkers() {
+  const maxIDP = Math.max(...IDP_DATA.map(d=>d.idp_count));
+
+  // Aggregate totals per point
+  const originTotals = {}, destTotals = {};
+  IDP_DATA.forEach(d => {
+    const ok = `${d.origin_lat},${d.origin_lng}`;
+    const dk = `${d.dest_lat},${d.dest_lng}`;
+    originTotals[ok] = (originTotals[ok]||0) + d.idp_count;
+    destTotals[dk]   = (destTotals[dk]||0) + d.idp_count;
+  });
+
+  const added = new Set();
+
+  IDP_DATA.forEach(d => {
+    const ok = `${d.origin_lat},${d.origin_lng}`;
+    if (!added.has('o'+ok)) {
+      added.add('o'+ok);
+      const total = originTotals[ok];
+      const r = 6 + (total/maxIDP)*14;
+      const m = L.circleMarker([d.origin_lat, d.origin_lng], {
+        radius: r, fillColor: '#4a90d9', color: '#fff',
+        weight: 2, fillOpacity: 0.85
+      }).addTo(leafletMap);
+      m.on('mousemove', (e) => showTooltip(e, null, d.origin_name, 'origin', total));
+      m.on('mouseout', hideTooltip);
+      originMarkers.push(m);
+    }
+
+    const dk = `${d.dest_lat},${d.dest_lng}`;
+    if (!added.has('d'+dk)) {
+      added.add('d'+dk);
+      const total = destTotals[dk];
+      const r = 6 + (total/maxIDP)*14;
+      const m = L.circleMarker([d.dest_lat, d.dest_lng], {
+        radius: r, fillColor: '#e74c3c', color: '#fff',
+        weight: 2, fillOpacity: 0.85
+      }).addTo(leafletMap);
+      m.on('mousemove', (e) => showTooltip(e, null, d.destination_name, 'dest', total));
+      m.on('mouseout', hideTooltip);
+      destMarkers.push(m);
+    }
+  });
+}
+
+/* ─── Flow paths (SVG) ─── */
+const flowPaths = [];
+
+function buildFlows() {
+  const maxIDP = Math.max(...IDP_DATA.map(d=>d.idp_count));
+  const totalIDP = IDP_DATA.reduce((s,d)=>s+d.idp_count,0);
+
+  IDP_DATA.forEach((d, i) => {
+    const color = colorScale(d.idp_count);
+    const weight = 1.5 + (d.idp_count/maxIDP)*10;
+    const pct = ((d.idp_count/totalIDP)*100).toFixed(1);
+
+    // Main curved path
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', weight);
+    path.setAttribute('stroke-linecap','round');
+    path.setAttribute('opacity','0.75');
+    path.style.pointerEvents = 'visibleStroke';
+    path.style.cursor = 'pointer';
+
+    // Animated dash overlay
+    const dash = document.createElementNS('http://www.w3.org/2000/svg','path');
+    dash.setAttribute('fill','none');
+    dash.setAttribute('stroke','rgba(255,255,255,0.7)');
+    dash.setAttribute('stroke-width', Math.max(1, weight*0.4));
+    dash.setAttribute('stroke-linecap','round');
+    dash.setAttribute('stroke-dasharray','8 52');
+    dash.style.pointerEvents = 'none';
+
+    // Arrowhead marker
+    const markerId = `arrow-${i}`;
+    let defs = svgEl.querySelector('defs');
+    if (!defs) { defs = document.createElementNS('http://www.w3.org/2000/svg','defs'); svgEl.appendChild(defs); }
+    const marker = document.createElementNS('http://www.w3.org/2000/svg','marker');
+    marker.setAttribute('id', markerId);
+    marker.setAttribute('markerWidth','8');
+    marker.setAttribute('markerHeight','8');
+    marker.setAttribute('refX','6');
+    marker.setAttribute('refY','3');
+    marker.setAttribute('orient','auto');
+    const arrowPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+    arrowPath.setAttribute('d','M0,0 L0,6 L8,3 z');
+    arrowPath.setAttribute('fill', color);
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+    path.setAttribute('marker-end', `url(#${markerId})`);
+
+    svgEl.appendChild(path);
+    svgEl.appendChild(dash);
+
+    // Hover
+    path.addEventListener('mousemove', (e) => showTooltip(e, d, null, 'flow', null, pct));
+    path.addEventListener('mouseout', hideTooltip);
+
+    flowPaths.push({ data: d, path, dash, weight, color });
+  });
+}
+
+/* ─── Project & draw SVG paths ─── */
+function latLngToSVG(lat, lng) {
+  const pt = leafletMap.latLngToContainerPoint([lat, lng]);
+  return pt;
+}
+
+function curvePath(p1, p2) {
+  // Cubic bezier with perpendicular offset for curvature
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const offset = dist * 0.28;
+  // Perpendicular
+  const mx = (p1.x+p2.x)/2 - dy/dist*offset;
+  const my = (p1.y+p2.y)/2 + dx/dist*offset;
+  return `M${p1.x},${p1.y} Q${mx},${my} ${p2.x},${p2.y}`;
+}
+
+function updateSVGPaths() {
+  const visible = flowPaths.filter(fp => fp.data.idp_count >= minFilter);
+  const hidden  = flowPaths.filter(fp => fp.data.idp_count < minFilter);
+
+  visible.forEach(fp => {
+    const p1 = latLngToSVG(fp.data.origin_lat, fp.data.origin_lng);
+    const p2 = latLngToSVG(fp.data.dest_lat, fp.data.dest_lng);
+    const d  = curvePath(p1, p2);
+    fp.path.setAttribute('d', d);
+    fp.dash.setAttribute('d', d);
+    fp.path.style.display = showFlows ? '' : 'none';
+    fp.dash.style.display = showFlows ? '' : 'none';
+  });
+
+  hidden.forEach(fp => {
+    fp.path.style.display = 'none';
+    fp.dash.style.display = 'none';
+  });
+}
+
+/* ─── Animation loop ─── */
+let dashOffset = 0;
+let lastTime = null;
+
+function animateFlows(ts) {
+  if (playing) {
+    const dt = lastTime ? (ts - lastTime) : 16;
+    lastTime = ts;
+    dashOffset -= dt * 0.06 * speedMult;
+    flowPaths.forEach(fp => {
+      fp.dash.setAttribute('stroke-dashoffset', dashOffset);
+    });
+  } else {
+    lastTime = null;
+  }
+  requestAnimationFrame(animateFlows);
+}
+
+/* ─── Controls ─── */
+function onSliderChange(val) {
+  minFilter = +val;
+  document.getElementById('slider-val').textContent = (+val).toLocaleString();
+  updateSVGPaths();
+}
+
+function onSpeedChange(val) {
+  speedMult = +val;
+  document.getElementById('speed-val').textContent = (+val).toFixed(1) + '×';
+}
+
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('play-btn').textContent = playing ? '⏸' : '▶';
+}
+
+function toggleLayer(layer) {
+  if (layer === 'flows') {
+    showFlows = !showFlows;
+    document.getElementById('tog-flows').classList.toggle('active', showFlows);
+    updateSVGPaths();
+  } else if (layer === 'origins') {
+    showOrigins = !showOrigins;
+    document.getElementById('tog-origins').classList.toggle('active', showOrigins);
+    originMarkers.forEach(m => showOrigins ? m.addTo(leafletMap) : leafletMap.removeLayer(m));
+  } else if (layer === 'dests') {
+    showDests = !showDests;
+    const btn = document.getElementById('tog-dests');
+    showDests ? btn.style.cssText='background:var(--red);border-color:var(--red);color:#fff;'
+              : btn.style.cssText='';
+    destMarkers.forEach(m => showDests ? m.addTo(leafletMap) : leafletMap.removeLayer(m));
+  }
+}
+
+/* ─── Tooltip ─── */
+const tooltip = document.getElementById('tooltip');
+const totalIDP = IDP_DATA.reduce((s,d)=>s+d.idp_count,0);
+
+function showTooltip(e, flow, name, type, total, pct) {
+  let html = '';
+  if (type === 'flow') {
+    html = `<div class="tt-route">${flow.origin_name} → ${flow.destination_name}</div>
+      <div class="tt-row"><span class="tt-key">IDPs displaced</span><span class="tt-val">${flow.idp_count.toLocaleString()}</span></div>
+      <div class="tt-row"><span class="tt-key">% of total</span><span class="tt-val">${pct}%</span></div>`;
+  } else if (type === 'origin') {
+    const pct2 = ((total/totalIDP)*100).toFixed(1);
+    html = `<div class="tt-route">${name}</div>
+      <div class="tt-row"><span class="tt-key">Type</span><span class="tt-val" style="color:#4a90d9;">Origin locality</span></div>
+      <div class="tt-row"><span class="tt-key">Total IDPs out</span><span class="tt-val">${total.toLocaleString()}</span></div>
+      <div class="tt-row"><span class="tt-key">% of total</span><span class="tt-val">${pct2}%</span></div>`;
+  } else {
+    const pct2 = ((total/totalIDP)*100).toFixed(1);
+    html = `<div class="tt-route">${name}</div>
+      <div class="tt-row"><span class="tt-key">Type</span><span class="tt-val" style="color:#e74c3c;">Displacement site</span></div>
+      <div class="tt-row"><span class="tt-key">Total IDPs received</span><span class="tt-val">${total.toLocaleString()}</span></div>
+      <div class="tt-row"><span class="tt-key">% of total</span><span class="tt-val">${pct2}%</span></div>`;
+  }
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  moveTooltip(e);
+}
+
+function moveTooltip(e) {
+  const x = e.clientX || (e.containerPoint && e.containerPoint.x + leafletMap.getContainer().getBoundingClientRect().left) || 0;
+  const y = e.clientY || (e.containerPoint && e.containerPoint.y + leafletMap.getContainer().getBoundingClientRect().top) || 0;
+  tooltip.style.left = (x + 14) + 'px';
+  tooltip.style.top  = (y - 10) + 'px';
+}
+function hideTooltip() { tooltip.style.display = 'none'; }
+document.addEventListener('mousemove', (e) => {
+  if (tooltip.style.display !== 'none') {
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top  = (e.clientY - 10) + 'px';
+  }
+});
+
+/* ─── Theme toggle ─── */
+function toggleTheme() {
+  currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  document.body.classList.toggle('light', currentTheme === 'light');
+  tileLayer.setUrl(currentTheme === 'light' ? TILE_LIGHT : TILE_DARK);
+  document.getElementById('theme-toggle').textContent = currentTheme === 'light' ? '🌙 Dark mode' : '☀ Light mode';
+}
+
+/* ─── Export hint ─── */
+/*
+  TO EXPORT AS PNG:
+  1. Open browser DevTools → Console
+  2. Run: leafletImage(leafletMap, function(err, canvas){ window.open(canvas.toDataURL()) })
+     (requires leaflet-image library: https://github.com/mapbox/leaflet-image)
+  OR use browser Print → Save as PDF for a quick PDF export.
+  OR take a full-page screenshot with browser extension (e.g. "GoFullPage").
+*/
+
+/* ─── Boot ─── */
+window.addEventListener('load', initMap);
+</script>
+</body>
+</html>
