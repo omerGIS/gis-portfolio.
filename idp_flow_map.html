@@ -3,705 +3,671 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>IDP Flow Map — Displacement Movements</title>
-
-<!-- Leaflet CSS -->
+<title>Sudan IDP Cross-Border Flow Monitor</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<!-- Leaflet JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<!-- D3 for color scales -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-<!-- Leaflet.heat (optional) / we use custom SVG animation -->
-
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#0d1117;color:#e6edf3;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  
+  /* HEADER */
+  #header{
+    background:linear-gradient(135deg,#0f1923 0%,#1a2840 50%,#0f1923 100%);
+    border-bottom:2px solid #2a4a6b;
+    padding:10px 20px;
+    display:flex;align-items:center;gap:16px;
+    box-shadow:0 2px 20px rgba(0,0,0,0.5);
+    z-index:1000;flex-shrink:0
+  }
+  #header .logo-wrap{display:flex;align-items:center;gap:12px}
+  #header .cbp-icon{width:44px;height:44px;flex-shrink:0}
+  #header h1{font-size:17px;font-weight:700;color:#e0ecff;letter-spacing:.4px;line-height:1.25}
+  #header h1 span{display:block;font-size:11px;font-weight:400;color:#7fa8cc;letter-spacing:.8px;text-transform:uppercase;margin-top:2px}
+  #header .org-badge{margin-left:auto;font-size:10px;color:#7fa8cc;text-align:right;line-height:1.5}
+  #header .org-badge strong{display:block;color:#b3c2e3;font-size:11px}
 
-  :root {
-    --bg: #0f1117;
-    --panel-bg: rgba(15,17,23,0.95);
-    --panel-border: rgba(255,255,255,0.08);
-    --text: #e8eaf0;
-    --text-muted: #8a8fa8;
-    --accent: #e07b39;
-    --accent2: #4a90d9;
-    --green: #2ecc71;
-    --red: #e74c3c;
-    --font: 'Segoe UI', system-ui, sans-serif;
-    --radius: 10px;
-    --shadow: 0 4px 24px rgba(0,0,0,0.5);
+  /* CONTROL PANEL */
+  #panel{
+    position:absolute;top:80px;left:14px;z-index:900;
+    background:rgba(13,25,40,0.94);
+    border:1px solid #2a4a6b;border-radius:10px;
+    padding:14px;width:252px;
+    backdrop-filter:blur(10px);
+    box-shadow:0 4px 32px rgba(0,0,0,0.6)
+  }
+  .panel-section{margin-bottom:14px}
+  .panel-section:last-child{margin-bottom:0}
+  .panel-label{font-size:10px;font-weight:700;color:#7fa8cc;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .panel-label::before{content:'';display:inline-block;width:3px;height:12px;border-radius:2px;background:#4a9eca}
+  
+  .filter-btn{
+    display:block;width:100%;text-align:left;padding:7px 10px;margin-bottom:5px;
+    background:rgba(255,255,255,0.05);border:1px solid #2a4a6b;border-radius:6px;
+    color:#c8d8e8;font-size:12px;cursor:pointer;transition:all .2s;
+    display:flex;align-items:center;gap:8px
+  }
+  .filter-btn:hover{background:rgba(74,158,202,0.15);border-color:#4a9eca}
+  .filter-btn.active{background:rgba(74,158,202,0.2);border-color:#4a9eca;color:#fff}
+  .filter-btn .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+  .dot-green{background:#53b4af;box-shadow:0 0 6px #53b4af}
+  .dot-red{background:#d3292e;box-shadow:0 0 6px #d3292e}
+  .dot-both{background:linear-gradient(135deg,#53b4af 50%,#d3292e 50%)}
+
+  select{
+    width:100%;padding:7px 10px;background:rgba(255,255,255,0.07);
+    border:1px solid #2a4a6b;border-radius:6px;color:#c8d8e8;
+    font-size:12px;cursor:pointer;outline:none;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='%237fa8cc'%3E%3Cpath d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 10px center
+  }
+  select:focus{border-color:#4a9eca}
+  select option{background:#0d1923}
+
+  /* LEGEND */
+  .legend-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px;color:#a8c0d8}
+  .legend-arrow{width:28px;height:8px;border-radius:4px;position:relative;overflow:hidden}
+  .legend-arrow.in{background:linear-gradient(90deg,transparent,#53b4af);box-shadow:0 0 6px #53b4af80}
+  .legend-arrow.out{background:linear-gradient(90deg,transparent,#d3292e);box-shadow:0 0 6px #d3292e80}
+  .legend-bubble{border-radius:50%;flex-shrink:0}
+  
+  /* STATS BAR */
+  #stats{
+    position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:900;
+    background:rgba(13,25,40,0.94);border:1px solid #2a4a6b;border-radius:10px;
+    padding:10px 20px;display:flex;gap:28px;align-items:center;
+    backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,0.5)
+  }
+  .stat-item{text-align:center}
+  .stat-num{font-size:18px;font-weight:700;line-height:1}
+  .stat-label{font-size:10px;color:#7fa8cc;margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
+  .stat-in .stat-num{color:#53b4af;text-shadow:0 0 10px #53b4af80}
+  .stat-out .stat-num{color:#d3292e;text-shadow:0 0 10px #d3292e80}
+  .stat-div{width:1px;height:32px;background:#2a4a6b}
+
+  /* TOOLTIP */
+  .flow-tooltip{
+    background:rgba(10,20,35,0.96)!important;
+    border:1px solid #4a9eca!important;border-radius:8px!important;
+    color:#e0ecff!important;font-size:12px!important;
+    box-shadow:0 4px 20px rgba(0,0,0,0.6)!important;
+    padding:10px 14px!important;min-width:160px!important
+  }
+  .tooltip-title{font-weight:700;font-size:13px;margin-bottom:6px;color:#fff}
+  .tooltip-row{display:flex;justify-content:space-between;gap:12px;margin-bottom:3px}
+  .tooltip-key{color:#7fa8cc}
+  .tooltip-val{font-weight:600}
+  .tv-green{color:#53b4af}
+  .tv-red{color:#d3292e}
+
+  /* MAP */
+  #map{flex:1;z-index:1}
+  
+  /* Leaflet overrides */
+  .leaflet-container{background:#b3c2e3!important}
+  
+  /* ANIMATIONS */
+  @keyframes flowPulse{
+    0%{stroke-dashoffset:100;opacity:.7}
+    100%{stroke-dashoffset:0;opacity:1}
+  }
+  @keyframes bubblePulse{
+    0%,100%{transform:scale(1);opacity:.85}
+    50%{transform:scale(1.08);opacity:1}
+  }
+  .bubble-marker{animation:bubblePulse 2.5s ease-in-out infinite}
+
+  /* Source tag */
+  #source-tag{
+    position:absolute;bottom:70px;right:14px;z-index:900;
+    font-size:10px;color:#7fa8cc;
+    background:rgba(13,25,40,0.8);padding:5px 10px;border-radius:5px;
+    border:1px solid #2a4a6b
   }
 
-  body.light {
-    --bg: #f0f2f5;
-    --panel-bg: rgba(255,255,255,0.97);
-    --panel-border: rgba(0,0,0,0.10);
-    --text: #1a1d2e;
-    --text-muted: #5a5f78;
-    --shadow: 0 4px 24px rgba(0,0,0,0.12);
+  /* Loading */
+  #loading{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    z-index:9999;background:rgba(13,25,40,0.95);border:1px solid #2a4a6b;
+    border-radius:12px;padding:24px 36px;text-align:center;
+    box-shadow:0 8px 40px rgba(0,0,0,0.7)
   }
-
-  html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text); overflow: hidden; }
-
-  #map { position: absolute; inset: 0; z-index: 1; }
-
-  /* ── SIDEBAR ── */
-  #sidebar {
-    position: absolute;
-    top: 12px; left: 12px;
-    width: 280px;
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: calc(100vh - 24px);
-    overflow-y: auto;
-    scrollbar-width: none;
-  }
-  #sidebar::-webkit-scrollbar { display: none; }
-
-  .panel {
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: var(--radius);
-    padding: 14px 16px;
-    box-shadow: var(--shadow);
-    backdrop-filter: blur(12px);
-  }
-
-  .panel-title {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.10em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin-bottom: 10px;
-  }
-
-  /* Map title panel */
-  #title-panel h1 {
-    font-size: 15px;
-    font-weight: 700;
-    line-height: 1.3;
-    color: var(--text);
-    margin-bottom: 4px;
-  }
-  #title-panel p {
-    font-size: 11px;
-    color: var(--text-muted);
-  }
-
-  /* Stats grid */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-  .stat-card {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid var(--panel-border);
-    border-radius: 7px;
-    padding: 8px 10px;
-  }
-  body.light .stat-card { background: rgba(0,0,0,0.03); }
-  .stat-label { font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
-  .stat-value { font-size: 17px; font-weight: 700; color: var(--text); line-height: 1; }
-  .stat-value.accent { color: var(--accent); }
-  .stat-value.blue { color: var(--accent2); }
-
-  /* Filter slider */
-  .filter-row { margin-bottom: 10px; }
-  .filter-row label { font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 6px; }
-  .filter-row label span { color: var(--text); font-weight: 600; }
-
-  input[type=range] {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(255,255,255,0.12);
-    outline: none;
-  }
-  body.light input[type=range] { background: rgba(0,0,0,0.10); }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-    border: 2px solid var(--panel-bg);
-  }
-
-  /* Toggle buttons */
-  .toggle-group { display: flex; gap: 6px; flex-wrap: wrap; }
-  .toggle-btn {
-    flex: 1;
-    min-width: 60px;
-    padding: 6px 8px;
-    font-size: 11px;
-    font-weight: 600;
-    border: 1px solid var(--panel-border);
-    border-radius: 6px;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.18s;
-    text-align: center;
-  }
-  .toggle-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .toggle-btn.active.blue-btn { background: var(--accent2); border-color: var(--accent2); }
-
-  /* Animation controls */
-  .anim-row { display: flex; align-items: center; gap: 8px; }
-  .play-btn {
-    width: 32px; height: 32px;
-    border-radius: 50%;
-    border: 1px solid var(--panel-border);
-    background: var(--accent);
-    color: #fff;
-    font-size: 12px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    transition: transform 0.1s;
-  }
-  .play-btn:hover { transform: scale(1.08); }
-  .speed-label { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
-
-  /* Legend */
-  .legend-bar {
-    height: 10px;
-    border-radius: 5px;
-    margin: 6px 0 4px;
-  }
-  .legend-ends { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); }
-  .legend-dots { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
-  .legend-dot { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text); }
-  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
-  /* Width legend */
-  .width-legend { display: flex; align-items: flex-end; gap: 4px; margin-top: 6px; }
-  .wl-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .wl-line { border-radius: 3px; background: var(--accent); width: 28px; }
-  .wl-label { font-size: 9px; color: var(--text-muted); }
-
-  /* Theme toggle */
-  #theme-toggle {
-    position: absolute;
-    top: 12px; right: 12px;
-    z-index: 1000;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 12px;
-    color: var(--text);
-    cursor: pointer;
-    box-shadow: var(--shadow);
-    backdrop-filter: blur(12px);
-    font-family: var(--font);
-  }
-
-  /* Tooltip */
-  #tooltip {
-    position: absolute;
-    z-index: 2000;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 8px;
-    padding: 10px 13px;
-    font-size: 12px;
-    color: var(--text);
-    box-shadow: var(--shadow);
-    pointer-events: none;
-    max-width: 220px;
-    display: none;
-    backdrop-filter: blur(12px);
-  }
-  #tooltip .tt-route { font-weight: 700; font-size: 13px; margin-bottom: 5px; color: var(--accent); }
-  #tooltip .tt-row { display: flex; justify-content: space-between; gap: 12px; }
-  #tooltip .tt-key { color: var(--text-muted); }
-  #tooltip .tt-val { font-weight: 600; }
-
-  /* Flow SVG overlay */
-  #flow-svg {
-    position: absolute;
-    inset: 0;
-    z-index: 500;
-    pointer-events: none;
-    overflow: visible;
-  }
-
-  /* Animated dash style injected per path */
-  @keyframes dash-move {
-    to { stroke-dashoffset: -60; }
-  }
-
-  /* Mobile */
-  @media (max-width: 600px) {
-    #sidebar { width: calc(100vw - 24px); }
-  }
+  #loading .spinner{width:36px;height:36px;border:3px solid #2a4a6b;border-top-color:#4a9eca;
+    border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #loading p{font-size:13px;color:#7fa8cc}
 </style>
 </head>
 <body>
 
+<!-- HEADER -->
+<!--<div id="header">
+  <div class="logo-wrap">
+    <svg class="cbp-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 266.46 266.46">
+      <circle fill="#f5f5f5" cx="133.23" cy="133.23" r="133.23"/>
+      <rect fill="#d3292e" x="188.89" y="115.84" width="27.83" height="31.31"/>
+      <rect fill="#d3292e" x="119.32" y="115.84" width="27.83" height="31.31"/>
+      <rect fill="#d3292e" x="49.74" y="115.84" width="27.83" height="31.31"/>
+      <path fill="#d3292e" d="M191.95,98.86c2.04,2.04,4.71,3.06,7.38,3.06s5.34-1.02,7.38-3.06c4.08-4.07,4.08-10.68,0-14.76l-31.3-31.3c-.49-.49-1.03-.93-1.61-1.32-.23-.15-.48-.26-.72-.39-.35-.2-.69-.41-1.07-.56-.33-.14-.68-.21-1.02-.32-.31-.09-.61-.21-.93-.28-1.35-.27-2.74-.27-4.08,0-.32.06-.62.18-.93.28-.34.1-.68.18-1.01.31-.38.16-.72.37-1.07.57-.24.13-.49.24-.72.39-.58.39-1.12.83-1.61,1.32l-31.3,31.3c-4.08,4.07-4.08,10.68,0,14.76,2.04,2.04,4.71,3.06,7.38,3.06s5.34-1.02,7.38-3.06l13.49-13.49v120.92c0,5.77,4.67,10.44,10.44,10.44s10.44-4.67,10.44-10.44v-120.92l13.49,13.49Z"/>
+      <path fill="#d3292e" d="M122.37,167.6l-13.49,13.49V60.18c0-5.77-4.67-10.44-10.44-10.44s-10.44,4.67-10.44,10.44v120.92l-13.49-13.49c-4.08-4.08-10.68-4.08-14.76,0-4.08,4.07-4.08,10.68,0,14.76l31.3,31.3c.49.49,1.03.93,1.61,1.32.23.15.48.26.72.39.35.2.7.41,1.07.57.33.14.67.21,1.01.31.31.09.61.21.93.28.67.13,1.36.21,2.04.21s1.37-.07,2.04-.21c.32-.06.62-.18.93-.28.34-.1.69-.18,1.02-.32.38-.16.72-.37,1.07-.56.24-.13.49-.24.72-.39.58-.39,1.12-.83,1.61-1.32l31.3-31.3c4.08-4.07,4.08-10.68,0-14.76-4.08-4.08-10.68-4.08-14.76,0Z"/>
+    </svg>
+    <h1>Sudan IDP Cross-Border Flow Monitor
+      <span>DTM Flow Monitoring Dashboard · 2024</span>
+    </h1>
+  </div>
+  <div class="org-badge">
+    <strong>IOM DTM</strong>
+    Sudan Crisis Response
+  </div>
+</div> -->
+
+<!-- MAP -->
 <div id="map"></div>
-<svg id="flow-svg"></svg>
-<div id="tooltip"></div>
-<button id="theme-toggle" onclick="toggleTheme()">☀ Light mode</button>
+<div id="loading"><div class="spinner"></div><p>Loading flow data…</p></div>
 
-<div id="sidebar">
-
-  <!-- Title -->
-  <div class="panel" id="title-panel">
-    <h1>IDP Displacement Flows</h1>
-    <p>Animated movement from origin to displacement localities</p>
+<!-- CONTROL PANEL -->
+<div id="panel">
+  <div class="panel-section">
+    <div class="panel-label">Flow Direction</div>
+    <button class="filter-btn active" id="btn-both" onclick="setFlowFilter('both')">
+      <span class="dot dot-both"></span>Show All Flows
+    </button>
+    <button class="filter-btn" id="btn-in" onclick="setFlowFilter('in')">
+      <span class="dot dot-green"></span>Flow In (into Sudan)
+    </button>
+    <button class="filter-btn" id="btn-out" onclick="setFlowFilter('out')">
+      <span class="dot dot-red"></span>Flow Out (from Sudan)
+    </button>
   </div>
 
-  <!-- Stats -->
-  <div class="panel">
-    <div class="panel-title">Summary statistics</div>
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Total IDPs</div>
-        <div class="stat-value accent" id="stat-total">—</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Flow routes</div>
-        <div class="stat-value" id="stat-flows">—</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Origin localities</div>
-        <div class="stat-value blue" id="stat-origins">—</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Destination sites</div>
-        <div class="stat-value" id="stat-dests">—</div>
-      </div>
-    </div>
-    <div style="margin-top:8px;">
-      <div class="stat-label">Largest single flow</div>
-      <div style="font-size:12px; color:var(--text); font-weight:600; margin-top:3px;" id="stat-largest">—</div>
-    </div>
+  <div class="panel-section">
+    <div class="panel-label">Filter by Country</div>
+    <select id="country-filter" onchange="setCountryFilter(this.value)">
+      <option value="all">All Countries</option>
+      <option value="Egypt">Egypt</option>
+      <option value="Chad">Chad</option>
+      <option value="Ethiopia">Ethiopia</option>
+    </select>
   </div>
 
-  <!-- Filter -->
-  <div class="panel">
-    <div class="panel-title">Filter flows</div>
-    <div class="filter-row">
-      <label>Min IDP count <span id="slider-val">0</span></label>
-      <input type="range" id="filter-slider" min="0" max="10000" step="50" value="0" oninput="onSliderChange(this.value)"/>
+  <div class="panel-section">
+    <div class="panel-label">Legend</div>
+    <div class="legend-row">
+      <div class="legend-arrow in"></div>
+      <span>Flow In — Arrivals into Sudan</span>
+    </div>
+    <div class="legend-row">
+      <div class="legend-arrow out"></div>
+      <span>Flow Out — Departures from Sudan</span>
+    </div>
+    <div class="legend-row" style="margin-top:6px">
+      <div class="legend-bubble" style="width:10px;height:10px;background:#53b4af;box-shadow:0 0 6px #53b4af;border:1px solid #fff3"></div>
+      <span>Flow-In total by Admin1 state</span>
+    </div>
+    <div class="legend-row">
+      <div class="legend-bubble" style="width:10px;height:10px;background:#d3292e;box-shadow:0 0 6px #d3292e;border:1px solid #fff3"></div>
+      <span>Flow-Out total by country</span>
+    </div>
+    <div class="legend-row" style="margin-top:6px">
+      <div style="width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,0.15);border:1px solid #4a9eca;display:flex;align-items:center;justify-content:center;font-size:8px">⊕</div>
+      <span>Cross-Border Point (CBP)</span>
     </div>
   </div>
-
-  <!-- Toggles -->
-  <div class="panel">
-    <div class="panel-title">Show / hide layers</div>
-    <div class="toggle-group">
-      <button class="toggle-btn active" id="tog-flows" onclick="toggleLayer('flows')">Flows</button>
-      <button class="toggle-btn active blue-btn" id="tog-origins" onclick="toggleLayer('origins')">Origins</button>
-      <button class="toggle-btn active" id="tog-dests" onclick="toggleLayer('dests')" style="background:var(--red); border-color:var(--red); color:#fff;">Destinations</button>
-    </div>
-  </div>
-
-  <!-- Animation controls -->
-  <div class="panel">
-    <div class="panel-title">Animation</div>
-    <div class="anim-row">
-      <button class="play-btn" id="play-btn" onclick="togglePlay()" title="Play/Pause">⏸</button>
-      <div style="flex:1;">
-        <label style="font-size:11px; color:var(--text-muted); display:flex; justify-content:space-between; margin-bottom:5px;">Speed <span id="speed-val">1×</span></label>
-        <input type="range" id="speed-slider" min="0.3" max="3" step="0.1" value="1" oninput="onSpeedChange(this.value)"/>
-      </div>
-    </div>
-  </div>
-
-  <!-- Legend -->
-  <div class="panel">
-    <div class="panel-title">Legend</div>
-    <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Flow color — IDP volume</div>
-    <div class="legend-bar" id="legend-gradient"></div>
-    <div class="legend-ends">
-      <span id="legend-min">Low</span>
-      <span id="legend-max">High</span>
-    </div>
-
-    <div style="margin-top:10px; font-size:11px; color:var(--text-muted); margin-bottom:4px;">Flow width — IDP count</div>
-    <div class="width-legend">
-      <div class="wl-item"><div class="wl-line" style="height:2px;"></div><div class="wl-label">Low</div></div>
-      <div class="wl-item"><div class="wl-line" style="height:5px;"></div><div class="wl-label">Mid</div></div>
-      <div class="wl-item"><div class="wl-line" style="height:9px;"></div><div class="wl-label">High</div></div>
-    </div>
-
-    <div class="legend-dots" style="margin-top:12px;">
-      <div class="legend-dot"><div class="dot" style="background:#4a90d9;"></div>Origin</div>
-      <div class="legend-dot"><div class="dot" style="background:#e74c3c;"></div>Destination</div>
-    </div>
-
-    <div style="margin-top:12px; font-size:10px; color:var(--text-muted); line-height:1.5;">
-      Data source: Field assessment survey.<br/>
-      Replace <code style="font-size:9px;">IDP_DATA</code> array with your data.
-    </div>
-  </div>
-
 </div>
 
+<!-- STATS BAR -->
+<div id="stats">
+  <div class="stat-item stat-in">
+    <div class="stat-num" id="stat-in-num">0</div>
+    <div class="stat-label">▲ Flow In (People)</div>
+  </div>
+  <div class="stat-div"></div>
+  <div class="stat-item stat-out">
+    <div class="stat-num" id="stat-out-num">0</div>
+    <div class="stat-label">▼ Flow Out (People)</div>
+  </div>
+  <div class="stat-div"></div>
+  <div class="stat-item">
+    <div class="stat-num" style="color:#b3c2e3">3</div>
+    <div class="stat-label">Neighboring Countries</div>
+  </div>
+  <div class="stat-div"></div>
+  <div class="stat-item">
+    <div class="stat-num" style="color:#b3c2e3">6</div>
+    <div class="stat-label">Cross-Border Points</div>
+  </div>
+</div>
+
+<div id="source-tag">Source: IOM DTM Sudan Flow Monitoring · 2024</div>
+
 <script>
-/* ═══════════════════════════════════════════
-   ★ REPLACE THIS ARRAY WITH YOUR REAL DATA ★
-   Each object must have:
-     origin_name, origin_lat, origin_lng,
-     destination_name, dest_lat, dest_lng,
-     idp_count
-═══════════════════════════════════════════ */
-const IDP_DATA = [
-  { origin_name:"Hamashkoreib", origin_lat:15.900, origin_lng:36.290, destination_name:"Kassala Town", dest_lat:15.461, dest_lng:36.400, idp_count:4200 },
-  { origin_name:"Khashm el-Girba", origin_lat:14.924, origin_lng:35.887, destination_name:"Kassala Town", dest_lat:15.461, dest_lng:36.400, idp_count:3100 },
-  { origin_name:"Telkok", origin_lat:15.750, origin_lng:36.150, destination_name:"Wad el-Helew", dest_lat:15.351, dest_lng:36.244, idp_count:1850 },
-  { origin_name:"Aroma", origin_lat:15.990, origin_lng:36.040, destination_name:"Kassala Town", dest_lat:15.461, dest_lng:36.400, idp_count:2600 },
-  { origin_name:"Hamashkoreib", origin_lat:15.900, origin_lng:36.290, destination_name:"Girba", dest_lat:14.933, dest_lng:35.921, idp_count:980 },
-  { origin_name:"Khashm el-Girba", origin_lat:14.924, origin_lng:35.887, destination_name:"Wad el-Helew", dest_lat:15.351, dest_lng:36.244, idp_count:1200 },
-  { origin_name:"Shagarab", origin_lat:16.090, origin_lng:36.330, destination_name:"Kassala Town", dest_lat:15.461, dest_lng:36.400, idp_count:3400 },
-  { origin_name:"Aroma", origin_lat:15.990, origin_lng:36.040, destination_name:"Wad el-Helew", dest_lat:15.351, dest_lng:36.244, idp_count:760 },
-  { origin_name:"Telkok", origin_lat:15.750, origin_lng:36.150, destination_name:"Kassala Town", dest_lat:15.461, dest_lng:36.400, idp_count:1450 },
-  { origin_name:"Shagarab", origin_lat:16.090, origin_lng:36.330, destination_name:"Girba", dest_lat:14.933, dest_lng:35.921, idp_count:530 },
+// ============================================================
+//  DATA
+// ============================================================
+const FLOW_DATA = [
+  // country, cbp_name, lat, lon, flow_in, flow_out
+  // State mapping for flow-in bubbles (nearest border state)
+  { country:'Egypt',    cbp:'Argeen',   lat:22.00, lon:31.51, flowIn:244147,  flowOut:1514827, state:'Northern',     stateLat:19.5, stateLon:30.5 },
+  { country:'Egypt',    cbp:'Ashkeet',  lat:21.99, lon:31.15, flowIn:291105,  flowOut:0,       state:'Northern',     stateLat:19.5, stateLon:30.5 },
+  { country:'Chad',     cbp:'At Tina',  lat:15.01, lon:22.49, flowIn:921,     flowOut:1308015, state:'West Darfur',  stateLat:12.5, stateLon:23.5 },
+  { country:'Chad',     cbp:'Adekong',  lat:15.15, lon:22.9,  flowIn:31576,   flowOut:0,       state:'West Darfur',  stateLat:12.5, stateLon:23.5 },
+  { country:'Chad',     cbp:'Umdukhun', lat:13.80, lon:21.9,  flowIn:49429,   flowOut:0,       state:'South Darfur', stateLat:11.5, stateLon:25.0 },
+  { country:'Ethiopia', cbp:'Gallabat', lat:12.62, lon:36.15, flowIn:1341,    flowOut:184055,  state:'Gedaref',      stateLat:14.0, stateLon:36.2 }
 ];
-/* ═══════════════════════════════════════════ */
 
-/* ─── State ─── */
-let minFilter = 0;
-let playing = true;
-let speedMult = 1;
-let showFlows = true, showOrigins = true, showDests = true;
-let animating = true;
-let animPaths = [];
-let originMarkers = [], destMarkers = [];
-let leafletMap, svgEl;
+// Neighboring country centroids for outflow bubbles
+const COUNTRY_CENTROIDS = {
+  'Egypt':    { lat:26.8, lon:30.8 },
+  'Chad':     { lat:15.5, lon:18.7 },
+  'Ethiopia': { lat:9.1,  lon:40.5 }
+};
 
-/* ─── Color scale ─── */
-const colorScale = d3.scaleSequential()
-  .interpolator(d3.interpolateYlOrRd);
-
-/* ─── Leaflet map init ─── */
-const TILE_DARK  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-const TILE_ATTR  = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>';
-
-let tileLayer;
-let currentTheme = 'dark';
-
-function initMap() {
-  leafletMap = L.map('map', { zoomControl: false });
-  L.control.zoom({ position: 'bottomright' }).addTo(leafletMap);
-
-  tileLayer = L.tileLayer(TILE_DARK, { attribution: TILE_ATTR, maxZoom: 18 });
-  tileLayer.addTo(leafletMap);
-
-  // Fit to bounding box of all points
-  const allLats = IDP_DATA.flatMap(d => [d.origin_lat, d.dest_lat]);
-  const allLngs = IDP_DATA.flatMap(d => [d.origin_lng, d.dest_lng]);
-  const bounds = [[Math.min(...allLats)-0.3, Math.min(...allLngs)-0.3],
-                  [Math.max(...allLats)+0.3, Math.max(...allLngs)+0.3]];
-  leafletMap.fitBounds(bounds);
-
-  leafletMap.on('moveend', updateSVGPaths);
-  leafletMap.on('zoomend', updateSVGPaths);
-  leafletMap.on('move', updateSVGPaths);
-
-  svgEl = document.getElementById('flow-svg');
-
-  computeStats();
-  buildMarkers();
-  buildFlows();
-  updateSVGPaths();
-  requestAnimationFrame(animateFlows);
+// Aggregated outflows & inflows per country
+function getCountryOutflow(country){
+  return FLOW_DATA.filter(d=>d.country===country).reduce((s,d)=>s+d.flowOut,0);
+}
+function getStateInflow(state){
+  return FLOW_DATA.filter(d=>d.state===state).reduce((s,d)=>s+d.flowIn,0);
 }
 
-/* ─── Statistics ─── */
-function computeStats() {
-  const total = IDP_DATA.reduce((s,d) => s+d.idp_count, 0);
-  const origins = new Set(IDP_DATA.map(d=>d.origin_name)).size;
-  const dests   = new Set(IDP_DATA.map(d=>d.destination_name)).size;
-  const largest = IDP_DATA.reduce((a,b) => a.idp_count>b.idp_count?a:b);
-
-  document.getElementById('stat-total').textContent  = total.toLocaleString();
-  document.getElementById('stat-flows').textContent  = IDP_DATA.length;
-  document.getElementById('stat-origins').textContent= origins;
-  document.getElementById('stat-dests').textContent  = dests;
-  document.getElementById('stat-largest').textContent= `${largest.origin_name} → ${largest.destination_name}: ${largest.idp_count.toLocaleString()}`;
-
-  const maxIDP = Math.max(...IDP_DATA.map(d=>d.idp_count));
-  const minIDP = Math.min(...IDP_DATA.map(d=>d.idp_count));
-  colorScale.domain([minIDP, maxIDP]);
-
-  // Slider max
-  document.getElementById('filter-slider').max = maxIDP;
-  document.getElementById('filter-slider').step = Math.max(1, Math.round(maxIDP/100));
-
-  // Legend gradient
-  document.getElementById('legend-gradient').style.background =
-    `linear-gradient(to right, ${d3.interpolateYlOrRd(0)}, ${d3.interpolateYlOrRd(0.5)}, ${d3.interpolateYlOrRd(1)})`;
-  document.getElementById('legend-min').textContent = minIDP.toLocaleString();
-  document.getElementById('legend-max').textContent = maxIDP.toLocaleString();
-}
-
-/* ─── Markers ─── */
-function buildMarkers() {
-  const maxIDP = Math.max(...IDP_DATA.map(d=>d.idp_count));
-
-  // Aggregate totals per point
-  const originTotals = {}, destTotals = {};
-  IDP_DATA.forEach(d => {
-    const ok = `${d.origin_lat},${d.origin_lng}`;
-    const dk = `${d.dest_lat},${d.dest_lng}`;
-    originTotals[ok] = (originTotals[ok]||0) + d.idp_count;
-    destTotals[dk]   = (destTotals[dk]||0) + d.idp_count;
-  });
-
-  const added = new Set();
-
-  IDP_DATA.forEach(d => {
-    const ok = `${d.origin_lat},${d.origin_lng}`;
-    if (!added.has('o'+ok)) {
-      added.add('o'+ok);
-      const total = originTotals[ok];
-      const r = 6 + (total/maxIDP)*14;
-      const m = L.circleMarker([d.origin_lat, d.origin_lng], {
-        radius: r, fillColor: '#4a90d9', color: '#fff',
-        weight: 2, fillOpacity: 0.85
-      }).addTo(leafletMap);
-      m.on('mousemove', (e) => showTooltip(e, null, d.origin_name, 'origin', total));
-      m.on('mouseout', hideTooltip);
-      originMarkers.push(m);
-    }
-
-    const dk = `${d.dest_lat},${d.dest_lng}`;
-    if (!added.has('d'+dk)) {
-      added.add('d'+dk);
-      const total = destTotals[dk];
-      const r = 6 + (total/maxIDP)*14;
-      const m = L.circleMarker([d.dest_lat, d.dest_lng], {
-        radius: r, fillColor: '#e74c3c', color: '#fff',
-        weight: 2, fillOpacity: 0.85
-      }).addTo(leafletMap);
-      m.on('mousemove', (e) => showTooltip(e, null, d.destination_name, 'dest', total));
-      m.on('mouseout', hideTooltip);
-      destMarkers.push(m);
-    }
-  });
-}
-
-/* ─── Flow paths (SVG) ─── */
-const flowPaths = [];
-
-function buildFlows() {
-  const maxIDP = Math.max(...IDP_DATA.map(d=>d.idp_count));
-  const totalIDP = IDP_DATA.reduce((s,d)=>s+d.idp_count,0);
-
-  IDP_DATA.forEach((d, i) => {
-    const color = colorScale(d.idp_count);
-    const weight = 1.5 + (d.idp_count/maxIDP)*10;
-    const pct = ((d.idp_count/totalIDP)*100).toFixed(1);
-
-    // Main curved path
-    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
-    path.setAttribute('fill','none');
-    path.setAttribute('stroke', color);
-    path.setAttribute('stroke-width', weight);
-    path.setAttribute('stroke-linecap','round');
-    path.setAttribute('opacity','0.75');
-    path.style.pointerEvents = 'visibleStroke';
-    path.style.cursor = 'pointer';
-
-    // Animated dash overlay
-    const dash = document.createElementNS('http://www.w3.org/2000/svg','path');
-    dash.setAttribute('fill','none');
-    dash.setAttribute('stroke','rgba(255,255,255,0.7)');
-    dash.setAttribute('stroke-width', Math.max(1, weight*0.4));
-    dash.setAttribute('stroke-linecap','round');
-    dash.setAttribute('stroke-dasharray','8 52');
-    dash.style.pointerEvents = 'none';
-
-    // Arrowhead marker
-    const markerId = `arrow-${i}`;
-    let defs = svgEl.querySelector('defs');
-    if (!defs) { defs = document.createElementNS('http://www.w3.org/2000/svg','defs'); svgEl.appendChild(defs); }
-    const marker = document.createElementNS('http://www.w3.org/2000/svg','marker');
-    marker.setAttribute('id', markerId);
-    marker.setAttribute('markerWidth','8');
-    marker.setAttribute('markerHeight','8');
-    marker.setAttribute('refX','6');
-    marker.setAttribute('refY','3');
-    marker.setAttribute('orient','auto');
-    const arrowPath = document.createElementNS('http://www.w3.org/2000/svg','path');
-    arrowPath.setAttribute('d','M0,0 L0,6 L8,3 z');
-    arrowPath.setAttribute('fill', color);
-    marker.appendChild(arrowPath);
-    defs.appendChild(marker);
-    path.setAttribute('marker-end', `url(#${markerId})`);
-
-    svgEl.appendChild(path);
-    svgEl.appendChild(dash);
-
-    // Hover
-    path.addEventListener('mousemove', (e) => showTooltip(e, d, null, 'flow', null, pct));
-    path.addEventListener('mouseout', hideTooltip);
-
-    flowPaths.push({ data: d, path, dash, weight, color });
-  });
-}
-
-/* ─── Project & draw SVG paths ─── */
-function latLngToSVG(lat, lng) {
-  const pt = leafletMap.latLngToContainerPoint([lat, lng]);
-  return pt;
-}
-
-function curvePath(p1, p2) {
-  // Cubic bezier with perpendicular offset for curvature
-  const dx = p2.x - p1.x, dy = p2.y - p1.y;
-  const dist = Math.sqrt(dx*dx + dy*dy);
-  const offset = dist * 0.28;
-  // Perpendicular
-  const mx = (p1.x+p2.x)/2 - dy/dist*offset;
-  const my = (p1.y+p2.y)/2 + dx/dist*offset;
-  return `M${p1.x},${p1.y} Q${mx},${my} ${p2.x},${p2.y}`;
-}
-
-function updateSVGPaths() {
-  const visible = flowPaths.filter(fp => fp.data.idp_count >= minFilter);
-  const hidden  = flowPaths.filter(fp => fp.data.idp_count < minFilter);
-
-  visible.forEach(fp => {
-    const p1 = latLngToSVG(fp.data.origin_lat, fp.data.origin_lng);
-    const p2 = latLngToSVG(fp.data.dest_lat, fp.data.dest_lng);
-    const d  = curvePath(p1, p2);
-    fp.path.setAttribute('d', d);
-    fp.dash.setAttribute('d', d);
-    fp.path.style.display = showFlows ? '' : 'none';
-    fp.dash.style.display = showFlows ? '' : 'none';
-  });
-
-  hidden.forEach(fp => {
-    fp.path.style.display = 'none';
-    fp.dash.style.display = 'none';
-  });
-}
-
-/* ─── Animation loop ─── */
-let dashOffset = 0;
-let lastTime = null;
-
-function animateFlows(ts) {
-  if (playing) {
-    const dt = lastTime ? (ts - lastTime) : 16;
-    lastTime = ts;
-    dashOffset -= dt * 0.06 * speedMult;
-    flowPaths.forEach(fp => {
-      fp.dash.setAttribute('stroke-dashoffset', dashOffset);
-    });
-  } else {
-    lastTime = null;
-  }
-  requestAnimationFrame(animateFlows);
-}
-
-/* ─── Controls ─── */
-function onSliderChange(val) {
-  minFilter = +val;
-  document.getElementById('slider-val').textContent = (+val).toLocaleString();
-  updateSVGPaths();
-}
-
-function onSpeedChange(val) {
-  speedMult = +val;
-  document.getElementById('speed-val').textContent = (+val).toFixed(1) + '×';
-}
-
-function togglePlay() {
-  playing = !playing;
-  document.getElementById('play-btn').textContent = playing ? '⏸' : '▶';
-}
-
-function toggleLayer(layer) {
-  if (layer === 'flows') {
-    showFlows = !showFlows;
-    document.getElementById('tog-flows').classList.toggle('active', showFlows);
-    updateSVGPaths();
-  } else if (layer === 'origins') {
-    showOrigins = !showOrigins;
-    document.getElementById('tog-origins').classList.toggle('active', showOrigins);
-    originMarkers.forEach(m => showOrigins ? m.addTo(leafletMap) : leafletMap.removeLayer(m));
-  } else if (layer === 'dests') {
-    showDests = !showDests;
-    const btn = document.getElementById('tog-dests');
-    showDests ? btn.style.cssText='background:var(--red);border-color:var(--red);color:#fff;'
-              : btn.style.cssText='';
-    destMarkers.forEach(m => showDests ? m.addTo(leafletMap) : leafletMap.removeLayer(m));
-  }
-}
-
-/* ─── Tooltip ─── */
-const tooltip = document.getElementById('tooltip');
-const totalIDP = IDP_DATA.reduce((s,d)=>s+d.idp_count,0);
-
-function showTooltip(e, flow, name, type, total, pct) {
-  let html = '';
-  if (type === 'flow') {
-    html = `<div class="tt-route">${flow.origin_name} → ${flow.destination_name}</div>
-      <div class="tt-row"><span class="tt-key">IDPs displaced</span><span class="tt-val">${flow.idp_count.toLocaleString()}</span></div>
-      <div class="tt-row"><span class="tt-key">% of total</span><span class="tt-val">${pct}%</span></div>`;
-  } else if (type === 'origin') {
-    const pct2 = ((total/totalIDP)*100).toFixed(1);
-    html = `<div class="tt-route">${name}</div>
-      <div class="tt-row"><span class="tt-key">Type</span><span class="tt-val" style="color:#4a90d9;">Origin locality</span></div>
-      <div class="tt-row"><span class="tt-key">Total IDPs out</span><span class="tt-val">${total.toLocaleString()}</span></div>
-      <div class="tt-row"><span class="tt-key">% of total</span><span class="tt-val">${pct2}%</span></div>`;
-  } else {
-    const pct2 = ((total/totalIDP)*100).toFixed(1);
-    html = `<div class="tt-route">${name}</div>
-      <div class="tt-row"><span class="tt-key">Type</span><span class="tt-val" style="color:#e74c3c;">Displacement site</span></div>
-      <div class="tt-row"><span class="tt-key">Total IDPs received</span><span class="tt-val">${total.toLocaleString()}</span></div>
-      <div class="tt-row"><span class="tt-key">% of total</span><span class="tt-val">${pct2}%</span></div>`;
-  }
-  tooltip.innerHTML = html;
-  tooltip.style.display = 'block';
-  moveTooltip(e);
-}
-
-function moveTooltip(e) {
-  const x = e.clientX || (e.containerPoint && e.containerPoint.x + leafletMap.getContainer().getBoundingClientRect().left) || 0;
-  const y = e.clientY || (e.containerPoint && e.containerPoint.y + leafletMap.getContainer().getBoundingClientRect().top) || 0;
-  tooltip.style.left = (x + 14) + 'px';
-  tooltip.style.top  = (y - 10) + 'px';
-}
-function hideTooltip() { tooltip.style.display = 'none'; }
-document.addEventListener('mousemove', (e) => {
-  if (tooltip.style.display !== 'none') {
-    tooltip.style.left = (e.clientX + 14) + 'px';
-    tooltip.style.top  = (e.clientY - 10) + 'px';
-  }
+// ============================================================
+//  MAP INIT
+// ============================================================
+const map = L.map('map', {
+  center: [15.5, 30.0],
+  zoom: 5,
+  zoomControl: false,
+  attributionControl: false
 });
 
-/* ─── Theme toggle ─── */
-function toggleTheme() {
-  currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  document.body.classList.toggle('light', currentTheme === 'light');
-  tileLayer.setUrl(currentTheme === 'light' ? TILE_LIGHT : TILE_DARK);
-  document.getElementById('theme-toggle').textContent = currentTheme === 'light' ? '🌙 Dark mode' : '☀ Light mode';
+// Hillshade basemap with tinted overlay effect
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', {
+  opacity: 0.45,
+  attribution:'',
+  maxZoom: 18
+}).addTo(map);
+
+fetch("D:\FM Story Map\Flow interactive map\ADMIN1.json")
+  .then(response => response.json())
+  .then(geojson => {
+    L.geoJSON(geojson, {
+      style: {
+        fillColor:   '#e6ecf7',
+        fillOpacity: 0.60,
+        color:       '#cccccc',
+        weight:      1,
+        opacity:     1
+      }
+    }).addTo(map);
+  });
+
+// Colored overlay using canvas renderer for the tint
+const colorTile = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+  opacity: 0, attribution:'', maxZoom:18
+}).addTo(map);
+
+// Use Stamen terrain-background for hillshade feel
+L.tileLayer('', {
+  opacity: 0.55, attribution:'', maxZoom:18
+}).addTo(map);
+
+// Color wash layer (SVG overlay rect — simpler approach: CSS on .leaflet-container)
+document.querySelector('.leaflet-container').style.background = '#b3c2e3';
+
+// Political boundaries
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+  opacity: 0.3, attribution:'', maxZoom:18
+}).addTo(map);
+
+L.control.zoom({position:'bottomright'}).addTo(map);
+L.control.attribution({prefix:false}).addTo(map).addAttribution('IOM DTM · Esri · Stamen');
+
+// ============================================================
+//  ADMIN1 LAYER
+// ============================================================
+let admin1Layer = null;
+const ADMIN1_URL = 'ADMIN1.json'; // hosted alongside index.html on GitHub Pages
+
+async function loadAdmin1(){
+  // Inline the GeoJSON directly since we have it
+  return ADMIN1_DATA;
 }
 
-/* ─── Export hint ─── */
-/*
-  TO EXPORT AS PNG:
-  1. Open browser DevTools → Console
-  2. Run: leafletImage(leafletMap, function(err, canvas){ window.open(canvas.toDataURL()) })
-     (requires leaflet-image library: https://github.com/mapbox/leaflet-image)
-  OR use browser Print → Save as PDF for a quick PDF export.
-  OR take a full-page screenshot with browser extension (e.g. "GoFullPage").
-*/
+// ============================================================
+//  LAYERS
+// ============================================================
+let cbpMarkers = L.layerGroup();
+let flowLines   = L.layerGroup();
+let inBubbles   = L.layerGroup();
+let outBubbles  = L.layerGroup();
 
-/* ─── Boot ─── */
-window.addEventListener('load', initMap);
+let currentFlowFilter = 'both';
+let currentCountry    = 'all';
+
+// --- Arrow / flow line using animated SVG dashes ---
+function makeCurvedLine(from, to, color, direction, caseload){
+  // Control point for curve
+  const midLat = (from[0]+to[0])/2 + (Math.random()-.5)*2;
+  const midLon = (from[1]+to[1])/2 + (Math.random()-.5)*3;
+
+  // Build a polyline with decorators using pure CSS animation via pane
+  const pts = [];
+  const steps = 20;
+  for(let i=0;i<=steps;i++){
+    const t = i/steps;
+    const lat = (1-t)*(1-t)*from[0] + 2*(1-t)*t*midLat + t*t*to[0];
+    const lon = (1-t)*(1-t)*from[1] + 2*(1-t)*t*midLon + t*t*to[1];
+    pts.push([lat,lon]);
+  }
+
+  const glowColor = color+'cc';
+  const id = 'fl_'+Math.random().toString(36).substr(2,8);
+
+  // Base glow line
+  const glow = L.polyline(pts,{
+    color: color, weight:7, opacity:0.18, lineCap:'round'
+  });
+
+  // Main animated dash line
+  const line = L.polyline(pts,{
+    color: color, weight:3, opacity:0.95, lineCap:'round',
+    dashArray:'12 10',
+    className: 'flow-line flow-'+direction
+  });
+
+  // Arrowhead at destination
+  const arrowPt = direction==='in' ? pts[pts.length-1] : pts[pts.length-1];
+  const prevPt  = pts[pts.length-3];
+  const bearing = Math.atan2(arrowPt[1]-prevPt[1], arrowPt[0]-prevPt[0]);
+
+  const grp = L.layerGroup([glow, line]);
+
+  // Attach tooltip
+  line.bindTooltip(`
+    <div class="flow-tooltip">
+      <div class="tooltip-title">${direction==='in'?'▲ Flow In':'▼ Flow Out'}</div>
+      <div class="tooltip-row"><span class="tooltip-key">Caseload</span><span class="tooltip-val ${direction==='in'?'tv-green':'tv-red'}">${formatNum(caseload)}</span></div>
+    </div>
+  `, {sticky:true, className:'', opacity:1});
+
+  // Store metadata
+  grp._direction = direction;
+  grp._country = '';
+  return grp;
+}
+
+function formatNum(n){
+  if(!n) return '0';
+  return n.toLocaleString();
+}
+
+// Bubble marker
+function makeBubble(lat, lon, value, color, label, sublabel){
+  const maxVal = 1600000;
+  const minR=12, maxR=48;
+  const r = minR + (maxR-minR)*Math.sqrt(value/maxVal);
+
+  const icon = L.divIcon({
+    className:'',
+    iconSize:[r*2, r*2],
+    iconAnchor:[r,r],
+    html:`<div style="
+      width:${r*2}px;height:${r*2}px;border-radius:50%;
+      background:${color}33;
+      border:2px solid ${color};
+      box-shadow:0 0 ${r}px ${color}66, 0 0 ${r/2}px ${color}99;
+      display:flex;align-items:center;justify-content:center;
+      flex-direction:column;
+      cursor:pointer;
+      animation:bubblePulse 2.5s ease-in-out infinite;
+    ">
+      <div style="font-size:${Math.max(9,r/2.8)}px;font-weight:700;color:${color};text-shadow:0 0 8px ${color};line-height:1.1;text-align:center">${formatK(value)}</div>
+    </div>`
+  });
+
+  const m = L.marker([lat,lon],{icon, zIndexOffset:100});
+  m.bindTooltip(`
+    <div class="flow-tooltip">
+      <div class="tooltip-title">${label}</div>
+      <div class="tooltip-row"><span class="tooltip-key">${sublabel}</span><span class="tooltip-val" style="color:${color}">${formatNum(value)}</span></div>
+    </div>
+  `, {direction:'top', className:'', opacity:1});
+  return m;
+}
+
+function formatK(n){
+  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(n>=1000) return (n/1000).toFixed(0)+'K';
+  return n.toString();
+}
+
+// CBP icon marker
+function makeCBP(lat, lon, data){
+  const icon = L.divIcon({
+    className:'',
+    iconSize:[32,32], iconAnchor:[16,16],
+    html:`<div style="
+      width:32px;height:32px;border-radius:50%;
+      background:rgba(10,20,35,0.85);
+      border:1.5px solid #4a9eca;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 0 8px rgba(74,158,202,0.5);
+    ">
+      <svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 266.46 266.46'>
+        <rect fill='#53b4af' x='188.89' y='115.84' width='27.83' height='31.31'/>
+        <rect fill='#53b4af' x='119.32' y='115.84' width='27.83' height='31.31'/>
+        <rect fill='#53b4af' x='49.74'  y='115.84' width='27.83' height='31.31'/>
+        <path fill='#53b4af' d='M191.95,98.86c2.04,2.04,4.71,3.06,7.38,3.06s5.34-1.02,7.38-3.06c4.08-4.07,4.08-10.68,0-14.76l-31.3-31.3c-.49-.49-1.03-.93-1.61-1.32-.23-.15-.48-.26-.72-.39-.35-.2-.69-.41-1.07-.56-.33-.14-.68-.21-1.02-.32-.31-.09-.61-.21-.93-.28-1.35-.27-2.74-.27-4.08,0-.32.06-.62.18-.93.28-.34.1-.68.18-1.01.31-.38.16-.72.37-1.07.57-.24.13-.49.24-.72.39-.58.39-1.12.83-1.61,1.32l-31.3,31.3c-4.08,4.07-4.08,10.68,0,14.76,2.04,2.04,4.71,3.06,7.38,3.06s5.34-1.02,7.38-3.06l13.49-13.49v120.92c0,5.77,4.67,10.44,10.44,10.44s10.44-4.67,10.44-10.44v-120.92l13.49,13.49Z'/>
+        <path fill='#d3292e' d='M122.37,167.6l-13.49,13.49V60.18c0-5.77-4.67-10.44-10.44-10.44s-10.44,4.67-10.44,10.44v120.92l-13.49-13.49c-4.08-4.08-10.68-4.08-14.76,0-4.08,4.07-4.08,10.68,0,14.76l31.3,31.3c.49.49,1.03.93,1.61,1.32.23.15.48.26.72.39.35.2.7.41,1.07.57.33.14.67.21,1.01.31.31.09.61.21.93.28.67.13,1.36.21,2.04.21s1.37-.07,2.04-.21c.32-.06.62-.18.93-.28.34-.1.69-.18,1.02-.32.38-.16.72-.37,1.07-.56.24-.13.49-.24.72-.39.58-.39,1.12-.83,1.61-1.32l31.3-31.3c4.08-4.07,4.08-10.68,0-14.76-4.08-4.08-10.68-4.08-14.76,0Z'/>
+      </svg>
+    </div>`
+  });
+
+  const inSum  = FLOW_DATA.filter(d=>d.cbp===data.cbp).reduce((s,d)=>s+d.flowIn,0);
+  const outSum = FLOW_DATA.filter(d=>d.cbp===data.cbp).reduce((s,d)=>s+d.flowOut,0);
+
+  const m = L.marker([lat,lon],{icon, zIndexOffset:200});
+  m.bindTooltip(`
+    <div class="flow-tooltip">
+      <div class="tooltip-title">📍 ${data.cbp}</div>
+      <div class="tooltip-row"><span class="tooltip-key">Country</span><span class="tooltip-val">${data.country}</span></div>
+      ${inSum  ? `<div class="tooltip-row"><span class="tooltip-key">▲ Flow In</span><span class="tooltip-val tv-green">${formatNum(inSum)}</span></div>` : ''}
+      ${outSum ? `<div class="tooltip-row"><span class="tooltip-key">▼ Flow Out</span><span class="tooltip-val tv-red">${formatNum(outSum)}</span></div>` : ''}
+    </div>
+  `, {direction:'top', className:'', opacity:1});
+
+  m._country = data.country;
+  return m;
+}
+
+// ============================================================
+//  BUILD LAYERS
+// ============================================================
+// Sudan centroid (used as origin/destination for flows)
+const SUDAN_CENTER = [15.55, 32.53];
+
+// Neighbor country destination points (cross-border flow out endpoints)
+// Flow-out: Sudan → neighboring country (undetermined CBP → country centroid)
+// Flow-in: CBP → border state
+
+function buildAllLayers(){
+  cbpMarkers.clearLayers();
+  flowLines.clearLayers();
+  inBubbles.clearLayers();
+  outBubbles.clearLayers();
+
+  const cf = currentCountry;
+  const ff = currentFlowFilter;
+
+  // Aggregate state inflows
+  const stateInflows = {};
+  const countryOutflows = {};
+  const countries = ['Egypt','Chad','Ethiopia'];
+
+  FLOW_DATA.forEach(d=>{
+    if(cf!=='all' && d.country!==cf) return;
+    if(d.flowIn){
+      stateInflows[d.state] = (stateInflows[d.state]||0) + d.flowIn;
+      // State coords — use first occurrence
+      if(!stateInflows[d.state+'_lat']){
+        stateInflows[d.state+'_lat'] = d.stateLat;
+        stateInflows[d.state+'_lon'] = d.stateLon;
+      }
+    }
+    if(d.flowOut){
+      countryOutflows[d.country] = (countryOutflows[d.country]||0) + d.flowOut;
+    }
+  });
+
+  // CBP markers
+  const addedCBPs = new Set();
+  FLOW_DATA.forEach(d=>{
+    if(cf!=='all' && d.country!==cf) return;
+    if(!addedCBPs.has(d.cbp)){
+      addedCBPs.add(d.cbp);
+      cbpMarkers.addLayer(makeCBP(d.lat, d.lon, d));
+    }
+  });
+
+  // FLOW LINES — Flow In: country centroid → border state
+  if(ff==='in'||ff==='both'){
+    FLOW_DATA.forEach(d=>{
+      if(cf!=='all'&&d.country!==cf) return;
+      if(!d.flowIn) return;
+      const from = [COUNTRY_CENTROIDS[d.country].lat, COUNTRY_CENTROIDS[d.country].lon];
+      const to   = [d.stateLat, d.stateLon];
+      const grp  = makeCurvedLine(from, to, '#53b4af', 'in', d.flowIn);
+      grp._country = d.country;
+      flowLines.addLayer(grp);
+    });
+  }
+
+  // FLOW LINES — Flow Out: Sudan → neighbor country centroid (generalized)
+  if(ff==='out'||ff==='both'){
+    countries.forEach(country=>{
+      if(cf!=='all'&&country!==cf) return;
+      const total = countryOutflows[country];
+      if(!total) return;
+      const from = SUDAN_CENTER;
+      const to   = [COUNTRY_CENTROIDS[country].lat, COUNTRY_CENTROIDS[country].lon];
+      const grp  = makeCurvedLine(from, to, '#d3292e', 'out', total);
+      grp._country = country;
+      flowLines.addLayer(grp);
+    });
+  }
+
+  // BUBBLES — Flow In: by Admin1 state (green)
+  if(ff==='in'||ff==='both'){
+    Object.keys(stateInflows).forEach(state=>{
+      if(state.endsWith('_lat')||state.endsWith('_lon')) return;
+      const val = stateInflows[state];
+      const lat = stateInflows[state+'_lat'];
+      const lon = stateInflows[state+'_lon'];
+      if(!val||!lat) return;
+      inBubbles.addLayer(makeBubble(lat, lon, val, '#53b4af', state+' (Flow In)', 'Arrivals'));
+    });
+  }
+
+  // BUBBLES — Flow Out: by country centroid (red)
+  if(ff==='out'||ff==='both'){
+    Object.keys(countryOutflows).forEach(country=>{
+      const val = countryOutflows[country];
+      const c   = COUNTRY_CENTROIDS[country];
+      outBubbles.addLayer(makeBubble(c.lat, c.lon, val, '#d3292e', country+' (Flow Out)', 'Departures'));
+    });
+  }
+
+  // Update stats
+  const totalIn  = FLOW_DATA.filter(d=>cf==='all'||d.country===cf).reduce((s,d)=>s+d.flowIn,0);
+  const totalOut = FLOW_DATA.filter(d=>cf==='all'||d.country===cf).reduce((s,d)=>s+d.flowOut,0);
+  document.getElementById('stat-in-num').textContent  = formatNum(totalIn);
+  document.getElementById('stat-out-num').textContent = formatNum(totalOut);
+}
+
+// ============================================================
+//  ADMIN1 GEOJSON (embedded inline)
+// ============================================================
+let admin1GeoLayer = null;
+
+async function initMap(){
+  document.getElementById('loading').style.display='flex';
+  try{
+    const resp = await fetch('ADMIN1.json');
+    const geojson = await resp.json();
+    renderAdmin1(geojson);
+  } catch(e){
+    // If hosted locally without server, skip admin1
+    console.warn('Admin1 fetch failed, rendering without it:', e);
+  }
+  
+  // Add all layer groups to map
+  flowLines.addTo(map);
+  cbpMarkers.addTo(map);
+  inBubbles.addTo(map);
+  outBubbles.addTo(map);
+
+  buildAllLayers();
+  document.getElementById('loading').style.display='none';
+}
+
+function renderAdmin1(geojson){
+  if(admin1GeoLayer) map.removeLayer(admin1GeoLayer);
+  admin1GeoLayer = L.geoJSON(geojson, {
+    style: {
+      color:'#4a6fa5',
+      weight:1.2,
+      opacity:0.7,
+      fillColor:'#b3c2e3',
+      fillOpacity:0.18,
+      dashArray:'3 4'
+    },
+    onEachFeature:(feat, layer)=>{
+      const name = feat.properties.admin1Name_en || feat.properties.name || '';
+      const pcode = feat.properties.admin1Pcode || feat.properties.pcode || '';
+      // Check if this state has inflows
+      const stateIn = FLOW_DATA.filter(d=>d.state===name).reduce((s,d)=>s+d.flowIn,0);
+      if(stateIn>0){
+        layer.setStyle({fillColor:'#53b4af',fillOpacity:0.12,color:'#53b4af',weight:1.5});
+      }
+      layer.bindTooltip(`<div class="flow-tooltip"><div class="tooltip-title">${name}</div>${stateIn?`<div class="tooltip-row"><span class="tooltip-key">▲ Flow In</span><span class="tooltip-val tv-green">${formatNum(stateIn)}</span></div>`:'<div style="color:#7fa8cc;font-size:11px">No recorded inflows</div>'}</div>`,
+        {sticky:true,className:'',opacity:1});
+    }
+  }).addTo(map);
+}
+
+// ============================================================
+//  FILTERS
+// ============================================================
+function setFlowFilter(dir){
+  currentFlowFilter = dir;
+  ['both','in','out'].forEach(d=>{
+    document.getElementById('btn-'+d).classList.toggle('active', d===dir);
+  });
+  buildAllLayers();
+}
+
+function setCountryFilter(val){
+  currentCountry = val;
+  buildAllLayers();
+}
+
+// ============================================================
+//  CSS ANIMATION for flow lines
+// ============================================================
+const styleEl = document.createElement('style');
+styleEl.textContent = `
+  .flow-in { animation: dashFlowIn 1.2s linear infinite; }
+  .flow-out { animation: dashFlowOut 1.2s linear infinite; }
+  @keyframes dashFlowIn  { to { stroke-dashoffset: -44; } }
+  @keyframes dashFlowOut { to { stroke-dashoffset:  44; } }
+  path.flow-in  { filter: drop-shadow(0 0 4px #53b4afcc); }
+  path.flow-out { filter: drop-shadow(0 0 4px #d3292ecc); }
+`;
+document.head.appendChild(styleEl);
+
+// ============================================================
+//  INIT
+// ============================================================
+initMap();
 </script>
 </body>
 </html>
